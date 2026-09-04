@@ -1,28 +1,60 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 from app.database import get_db
 from app.schemas.search import SearchRequest, SearchResponse, SearchResult
 from app.services.vector_search import VectorSearchService
 from app.services.llm_service import LLMService
+from app.services.query_enhancer import enhance_query
 from app.models.document import SearchLog
 
 router = APIRouter()
 
+_vector_service = None
+_llm_service = None
+
+
+def _get_vector_service() -> VectorSearchService:
+    global _vector_service
+    if _vector_service is None:
+        _vector_service = VectorSearchService()
+    return _vector_service
+
+
+def _get_llm_service() -> LLMService:
+    global _llm_service
+    if _llm_service is None:
+        _llm_service = LLMService()
+    return _llm_service
+
 
 @router.post("", response_model=SearchResponse)
 async def search_laws(request: SearchRequest, db: AsyncSession = Depends(get_db)):
-    vector_service = VectorSearchService()
-    llm_service = LLMService()
+    vector_svc = _get_vector_service()
+    llm_svc = _get_llm_service()
 
-    results = await vector_service.search(
-        query=request.query,
-        province=request.province,
-        doc_type=request.doc_type,
-        year_from=request.year_from,
-        year_to=request.year_to,
-        limit=request.limit,
-    )
+    enhanced = await enhance_query(request.query)
+
+    all_results = []
+    seen_ids = set()
+
+    for search_q in enhanced["search_queries"]:
+        if not search_q.strip():
+            continue
+        results = await vector_svc.search(
+            query=search_q,
+            province=request.province,
+            doc_type=request.doc_type,
+            year_from=request.year_from,
+            year_to=request.year_to,
+            limit=5,
+        )
+        for r in results:
+            if r["id"] not in seen_ids:
+                seen_ids.add(r["id"])
+                all_results.append(r)
+
+    all_results.sort(key=lambda x: x["score"], reverse=True)
+    top_results = all_results[:5]
 
     search_results = [
         SearchResult(
@@ -36,13 +68,16 @@ async def search_laws(request: SearchRequest, db: AsyncSession = Depends(get_db)
             year=r["payload"].get("year"),
             source_url=r["payload"].get("source_url", ""),
         )
-        for r in results
+        for r in top_results
     ]
 
-    context = "\n\n".join([f"--- {r.title} ({r.section}) ---\n{r.content}" for r in search_results[:5]])
+    context = "\n\n".join([
+        f"--- {r.title} ({r.section}) ---\n{r.content[:1500]}"
+        for r in search_results
+    ])
 
-    llm_response = await llm_service.generate_legal_answer(
-        query=request.query,
+    llm_response = await llm_svc.generate_legal_answer(
+        query=enhanced["english"],
         context=context,
     )
 
@@ -68,16 +103,20 @@ async def get_suggestions(q: str = "", limit: int = 5):
     common_queries = [
         "Can police check my phone without a warrant?",
         "What are my rights during arrest?",
-        "How to file an FIR?",
-        "What is the punishment for theft?",
+        "How to file an FIR in Pakistan?",
+        "What is the punishment for theft under PPC?",
         "Can my landlord evict me without notice?",
-        "What to do if cyber harassed?",
-        "How to get bail?",
-        "What are fundamental rights in Pakistan?",
+        "What to do if someone cyber harasses me?",
+        "How to get bail in a criminal case?",
+        "What are fundamental rights in the Constitution of Pakistan?",
+        "Can anyone file an FIR without evidence?",
+        "What is PECA and how does it protect me online?",
     ]
 
     if q:
         filtered = [s for s in common_queries if q.lower() in s.lower()]
+        if not filtered:
+            filtered = common_queries[:limit]
         return filtered[:limit]
 
     return common_queries[:limit]

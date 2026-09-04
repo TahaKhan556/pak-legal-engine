@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
+        kanun: {
           50: '#f0fdf4',
           100: '#dcfce7',
           200: '#bbf7d0',
@@ -15,7 +15,21 @@ export default {
           700: '#15803d',
           800: '#166534',
           900: '#14532d',
+          950: '#052e16',
         },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        'display': ['clamp(2rem, 5vw, 3.5rem)', { lineHeight: '1.1', fontWeight: '700' }],
+        'heading': ['clamp(1.25rem, 3vw, 2rem)', { lineHeight: '1.2', fontWeight: '600' }],
+      },
+      boxShadow: {
+        'card': '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
+        'card-hover': '0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04)',
+        'verdict': '0 0 0 1px rgb(34 197 94 / 0.1), 0 4px 16px 0 rgb(34 197 94 / 0.08)',
       },
     },
   },

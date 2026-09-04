@@ -7,16 +7,27 @@ from app.database import init_db
 from app.api.v1 import search, documents, contributors, admin
 
 
+_scheduler = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    global _scheduler
+    try:
+        from app.tasks.scheduler import start_scheduler
+        _scheduler = start_scheduler()
+    except Exception:
+        pass
     yield
+    if _scheduler:
+        _scheduler.shutdown()
 
 
 app = FastAPI(
     title="Kanun - Legal Knowledge Engine",
     description="Pakistani Law Search & Plain-Language Legal Answers",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -36,4 +47,4 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "kanun-legal-engine"}
+    return {"status": "healthy", "service": "kanun-legal-engine", "version": "1.1.0"}

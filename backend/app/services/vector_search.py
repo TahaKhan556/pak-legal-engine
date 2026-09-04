@@ -2,18 +2,32 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 from sentence_transformers import SentenceTransformer
 from typing import Optional
-import os
+import threading
 
 from app.config import settings
 
 
+_model_lock = threading.Lock()
+_model_instance = None
+
+
+def _get_model() -> SentenceTransformer:
+    global _model_instance
+    if _model_instance is None:
+        with _model_lock:
+            if _model_instance is None:
+                _model_instance = SentenceTransformer("BAAI/bge-base-en-v1.5")
+    return _model_instance
+
+
 class VectorSearchService:
+    MIN_SCORE = 0.65
+
     def __init__(self):
         self.client = QdrantClient(
             host=settings.QDRANT_HOST,
             port=settings.QDRANT_PORT,
         )
-        self.model = SentenceTransformer("BAAI/bge-base-en-v1.5")
         self.collection = "legal_docs"
 
     async def search(
@@ -23,9 +37,10 @@ class VectorSearchService:
         doc_type: Optional[str] = None,
         year_from: Optional[int] = None,
         year_to: Optional[int] = None,
-        limit: int = 10,
+        limit: int = 5,
     ) -> list[dict]:
-        query_embedding = self.model.encode(query).tolist()
+        model = _get_model()
+        query_embedding = model.encode(query).tolist()
 
         must_conditions = []
 
@@ -53,18 +68,21 @@ class VectorSearchService:
             collection_name=self.collection,
             query=query_embedding,
             query_filter=query_filter,
-            limit=limit,
+            limit=min(limit * 3, 30),
             with_payload=True,
         )
 
-        return [
+        filtered = [
             {
                 "id": str(point.id),
                 "score": point.score,
                 "payload": point.payload,
             }
             for point in results.points
+            if point.score >= self.MIN_SCORE
         ]
+
+        return filtered[:limit]
 
     async def get_collection_info(self) -> dict:
         info = self.client.get_collection(self.collection)

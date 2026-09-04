@@ -1,9 +1,12 @@
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 import { SearchBar } from '../components/SearchBar'
-import { LegalReference } from '../components/LegalReference'
-import { ActionSteps } from '../components/ActionSteps'
+import { VerdictCard } from '../components/VerdictCard'
+import { LegalCard } from '../components/LegalCard'
+import { LoadingSkeleton } from '../components/LoadingSkeleton'
+import { EmptyState } from '../components/EmptyState'
+import { CheckCircle, ArrowLeft, Share2 } from 'lucide-react'
 
 interface SearchResult {
   id: string
@@ -32,87 +35,127 @@ export function Results() {
   const [result, setResult] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState<'helpful' | 'not_helpful' | null>(null)
 
   useEffect(() => {
     if (query) {
       setLoading(true)
+      setError('')
+      setResult(null)
       api.post('/api/v1/search', { query })
         .then((res) => setResult(res.data))
-        .catch((err) => setError(err.message))
+        .catch((err) => setError(err.response?.data?.detail || 'Failed to search. Please try again.'))
         .finally(() => setLoading(false))
     }
   }, [query])
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href)
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 py-6">
-        <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-kanun-50/50">
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex items-center gap-3 mb-4">
+            <Link to="/" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <span className="text-sm text-gray-400">Search Results</span>
+          </div>
           <SearchBar />
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {loading && (
-          <div className="text-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-primary-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Searching legal database...</p>
-          </div>
-        )}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        {loading && <LoadingSkeleton />}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            {error}
-          </div>
+        {error && <EmptyState type="error" message={error} />}
+
+        {!loading && !error && !result && query && (
+          <EmptyState type="no-results" query={query} />
         )}
 
         {result && (
-          <>
-            <div className="card mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">The Verdict</h2>
-              <p className="text-lg text-gray-700">{result.verdict}</p>
-            </div>
+          <div className="space-y-6">
+            <VerdictCard verdict={result.verdict} />
 
-            <div className="card mb-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Plain Language Explanation</h3>
-              <p className="text-gray-700 whitespace-pre-line">{result.plain_language}</p>
+            <div className="card">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Plain Language Explanation</h3>
+              <div className="text-gray-700 leading-relaxed whitespace-pre-line">{result.plain_language}</div>
             </div>
 
             {result.plain_urdu && (
-              <div className="card mb-6 border-r-4 border-primary-500">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">اردو میں سادہ زبان</h3>
-                <p className="text-gray-700 whitespace-pre-line text-right" dir="rtl">{result.plain_urdu}</p>
+              <div className="card border-r-4 border-kanun-500 bg-kanun-50/30">
+                <h3 className="text-sm font-semibold text-kanun-600 uppercase tracking-wider mb-3">Roman Urdu</h3>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-line text-right" dir="rtl">{result.plain_urdu}</p>
               </div>
             )}
-
-            <div className="card mb-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Legal References</h3>
-              <div className="space-y-4">
-                {result.legal_references.map((ref) => (
-                  <LegalReference key={ref.id} reference={ref} />
-                ))}
-              </div>
-            </div>
 
             {result.steps.length > 0 && (
-              <div className="card mb-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">What You Can Do</h3>
-                <ActionSteps steps={result.steps} />
+              <div className="card">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">What You Can Do</h3>
+                <ol className="space-y-3">
+                  {result.steps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="w-6 h-6 bg-kanun-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-kanun-700">{i + 1}</span>
+                      </div>
+                      <span className="text-gray-700 leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
               </div>
             )}
 
-            <div className="text-center py-6">
-              <p className="text-gray-600 mb-4">Was this answer helpful?</p>
-              <div className="space-x-4">
-                <button className="btn-primary">Yes, helpful</button>
-                <button className="btn-secondary">Not helpful</button>
+            {result.legal_references.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Legal References</h3>
+                <div className="space-y-3">
+                  {result.legal_references.map((ref, i) => (
+                    <LegalCard key={ref.id} reference={ref} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="card">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">Was this answer helpful?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFeedback('helpful')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        feedback === 'helpful'
+                          ? 'bg-kanun-100 text-kanun-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      <CheckCircle className="h-4 w-4 inline mr-1.5" />
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setFeedback('not_helpful')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        feedback === 'not_helpful'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+                <button
+                  onClick={handleShare}
+                  className="btn-ghost text-sm"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Copy link
+                </button>
               </div>
             </div>
-          </>
-        )}
-
-        {!loading && !error && !result && query && (
-          <div className="text-center py-12 text-gray-600">
-            No results found for "{query}"
           </div>
         )}
       </div>

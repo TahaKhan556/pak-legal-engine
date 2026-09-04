@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
-import { FileText, Filter } from 'lucide-react'
+import { FileText, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface Document {
   id: string
@@ -14,6 +14,26 @@ interface Document {
   source_url: string | null
   created_at: string
 }
+
+const docTypes = [
+  { value: '', label: 'All Types' },
+  { value: 'constitution', label: 'Constitution' },
+  { value: 'ppc', label: 'Penal Code' },
+  { value: 'crpc', label: 'Criminal Procedure' },
+  { value: 'cpc', label: 'Civil Procedure' },
+  { value: 'federal_act', label: 'Federal Acts' },
+  { value: 'provincial_act', label: 'Provincial Acts' },
+  { value: 'ordinance', label: 'Ordinances' },
+]
+
+const provinces = [
+  { value: '', label: 'All Provinces' },
+  { value: 'federal', label: 'Federal' },
+  { value: 'sindh', label: 'Sindh' },
+  { value: 'punjab', label: 'Punjab' },
+  { value: 'kpk', label: 'KPK' },
+  { value: 'balochistan', label: 'Balochistan' },
+]
 
 export function Browse() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -39,47 +59,49 @@ export function Browse() {
       .finally(() => setLoading(false))
   }, [docType, province, search, page])
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          <aside className="w-full md:w-64 flex-shrink-0">
-            <div className="card">
-              <h3 className="font-semibold mb-4 flex items-center">
-                <Filter className="h-4 w-4 mr-2" /> Filters
-              </h3>
+  const updateFilter = (key: string, value: string) => {
+    const params = Object.fromEntries(searchParams)
+    if (value) {
+      params[key] = value
+    } else {
+      delete params[key]
+    }
+    setSearchParams(params)
+    setPage(1)
+  }
 
+  return (
+    <div className="min-h-screen bg-kanun-50/50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          <aside className="w-full lg:w-64 flex-shrink-0">
+            <div className="card sticky top-24">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Filter className="h-4 w-4 text-gray-500" /> Filters
+              </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Document Type</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Document Type</label>
                   <select
-                    className="input-field"
+                    className="input-field text-sm"
                     value={docType}
-                    onChange={(e) => setSearchParams({ ...Object.fromEntries(searchParams), doc_type: e.target.value })}
+                    onChange={(e) => updateFilter('doc_type', e.target.value)}
                   >
-                    <option value="">All Types</option>
-                    <option value="constitution">Constitution</option>
-                    <option value="ppc">Penal Code</option>
-                    <option value="crpc">Criminal Procedure</option>
-                    <option value="federal_act">Federal Acts</option>
-                    <option value="provincial_act">Provincial Acts</option>
-                    <option value="ordinance">Ordinances</option>
+                    {docTypes.map((dt) => (
+                      <option key={dt.value} value={dt.value}>{dt.label}</option>
+                    ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium mb-1">Province</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Province</label>
                   <select
-                    className="input-field"
+                    className="input-field text-sm"
                     value={province}
-                    onChange={(e) => setSearchParams({ ...Object.fromEntries(searchParams), province: e.target.value })}
+                    onChange={(e) => updateFilter('province', e.target.value)}
                   >
-                    <option value="">All Provinces</option>
-                    <option value="federal">Federal</option>
-                    <option value="sindh">Sindh</option>
-                    <option value="punjab">Punjab</option>
-                    <option value="kpk">KPK</option>
-                    <option value="balochistan">Balochistan</option>
+                    {provinces.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -87,43 +109,49 @@ export function Browse() {
           </aside>
 
           <main className="flex-1">
-            <h1 className="text-2xl font-bold mb-6">Browse Laws</h1>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-heading text-gray-900">Browse Laws</h1>
+              <span className="text-sm text-gray-500">{documents.length} results</span>
+            </div>
 
             {loading ? (
-              <div className="text-center py-12">Loading...</div>
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="card animate-pulse">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                      <div className="flex-1">
+                        <div className="h-5 bg-gray-200 rounded w-2/3 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : documents.length === 0 ? (
-              <div className="text-center py-12 text-gray-600">
-                No documents found. Try adjusting your filters.
+              <div className="card text-center py-12">
+                <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No documents found matching your filters.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {documents.map((doc) => (
-                  <div key={doc.id} className="card hover:shadow-xl transition-shadow cursor-pointer">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-5 w-5 text-primary-600" />
-                          <h3 className="font-semibold text-lg">{doc.title}</h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <span className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full">
-                            {doc.document_type}
-                          </span>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                            {doc.province}
-                          </span>
-                          {doc.year && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                              {doc.year}
-                            </span>
-                          )}
+                  <div key={doc.id} className="card-hover cursor-pointer">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-kanun-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-5 w-5 text-kanun-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 leading-snug mb-1">{doc.title}</h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="badge-green text-[11px]">{doc.document_type}</span>
+                          <span className="badge-blue text-[11px]">{doc.province}</span>
+                          {doc.year && <span className="badge-gray text-[11px]">{doc.year}</span>}
+                          <span className="badge-gray text-[11px]">{doc.total_sections} sections</span>
                         </div>
                         {doc.description && (
-                          <p className="text-sm text-gray-600 line-clamp-2">{doc.description}</p>
+                          <p className="text-sm text-gray-500 mt-2 line-clamp-2">{doc.description}</p>
                         )}
-                      </div>
-                      <div className="text-sm text-gray-500 ml-4">
-                        {doc.total_sections} sections
                       </div>
                     </div>
                   </div>
@@ -131,21 +159,21 @@ export function Browse() {
               </div>
             )}
 
-            <div className="flex justify-center gap-2 mt-8">
+            <div className="flex items-center justify-center gap-2 mt-8">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="btn-secondary disabled:opacity-50"
+                className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Previous
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="py-2 px-4">Page {page}</span>
+              <span className="px-4 py-2 text-sm text-gray-600">Page {page}</span>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={documents.length < 20}
-                className="btn-secondary disabled:opacity-50"
+                className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Next
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </main>

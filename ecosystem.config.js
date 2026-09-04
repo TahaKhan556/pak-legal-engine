@@ -15,7 +15,7 @@ module.exports = {
     },
     {
       name: 'kanun-backend',
-      script: 'python',
+      script: '/home/projects/pak-legal-engine/backend/venv/bin/python',
       args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2',
       cwd: '/home/projects/pak-legal-engine/backend',
       max_memory_restart: '512M',

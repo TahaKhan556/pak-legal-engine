@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 
@@ -21,13 +22,13 @@ class Settings(BaseSettings):
 
     APP_ENV: str = "development"
     SECRET_KEY: str = "dev-secret-key-change-in-production"
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:5173",
-        "http://localhost:5180",
-        "https://kanun.8.jugaar.ai",
-    ]
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5180,https://kanun.8.jugaar.ai"
 
     SENTRY_DSN: str = ""
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
 
     class Config:
         env_file = ".env"

@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5180,
+    allowedHosts: ['kanun.8.jugaar.ai', '.jugaar.ai'],
     proxy: {
       '/api': {
         target: 'http://localhost:8010',

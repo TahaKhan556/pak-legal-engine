@@ -29,7 +29,7 @@ litellm==1.52.5
 openai==1.58.0
 
 # Task Scheduling
-apscheduler==3.10.5
+apscheduler==3.10.4
 
 # Storage
 boto3==1.36.0

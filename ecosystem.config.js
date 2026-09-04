@@ -1,0 +1,30 @@
+module.exports = {
+  apps: [
+    {
+      name: 'kanun-frontend',
+      script: 'npm',
+      args: 'run dev -- --host 0.0.0.0 --port 5180',
+      cwd: '/home/projects/pak-legal-engine/frontend',
+      max_memory_restart: '256M',
+      restart_delay: 5000,
+      max_restarts: 10,
+      exp_backoff_restart_delay: 100,
+      error_file: '/var/log/kanun/frontend-error.log',
+      out_file: '/var/log/kanun/frontend-out.log',
+      merge_logs: true,
+    },
+    {
+      name: 'kanun-backend',
+      script: 'python',
+      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2',
+      cwd: '/home/projects/pak-legal-engine/backend',
+      max_memory_restart: '512M',
+      restart_delay: 5000,
+      max_restarts: 10,
+      exp_backoff_restart_delay: 100,
+      error_file: '/var/log/kanun/backend-error.log',
+      out_file: '/var/log/kanun/backend-out.log',
+      merge_logs: true,
+    },
+  ],
+};

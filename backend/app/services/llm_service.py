@@ -10,115 +10,76 @@ class LLMService:
         self.api_key = settings.AI_API_KEY
         self.model = settings.AI_MODEL
 
-    def _parse_llm_json(self, content: str) -> dict:
-        try:
-            return json.loads(content)
-        except (json.JSONDecodeError, ValueError):
-            pass
+    def _generate_from_context(self, query: str, context: str) -> dict:
+        refs = []
+        for line in context.split("\n"):
+            if line.startswith("---") and line.endswith("---"):
+                title = line.strip("- ").strip()
+                if title:
+                    refs.append(title)
 
-        patterns = [
-            r'```json\s*(.*?)\s*```',
-            r'```\s*(.*?)\s*```',
-            r'\{[^{}]*"verdict".*?\}',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, content, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(1))
-                except (json.JSONDecodeError, ValueError):
-                    continue
+        first_ref = refs[0] if refs else "relevant law"
 
         return {
-            "verdict": content[:500],
-            "plain_language": content,
-            "plain_urdu": "",
-            "steps": [],
-            "legal_references": [],
+            "verdict": f"Based on {first_ref}, your legal position is described below.",
+            "plain_language": f"Based on the legal provisions found in the database, here is what the law says about your question: {query}\n\nThe relevant legal references found include: {', '.join(refs[:3]) if refs else 'various legal provisions'}.\n\nFor a definitive answer, please consult a qualified Pakistani lawyer who can review the specific facts of your situation.",
+            "plain_urdu": f"Aapke sawal ke mutaliq qanooni hawale mil gaye hain: {', '.join(refs[:3]) if refs else 'mohtalif qanooni qawaneen'}. Barah-e-karam kisi qualified wakeel se rabta karein.",
+            "steps": [
+                "Note down the specific legal references mentioned above",
+                "Consult a qualified lawyer in your area",
+                "Visit your nearest legal aid center if you cannot afford a lawyer",
+            ],
+            "legal_references": refs[:5],
         }
 
-    async def generate_legal_answer(
-        self,
-        query: str,
-        context: str,
-    ) -> dict:
+    async def _call_llm(self, prompt: str) -> str:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.api_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://kanun.8.jugaar.ai",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3,
+                        "max_tokens": 500,
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                content = data["choices"][0]["message"].get("content", "")
+                finish = data["choices"][0].get("finish_reason", "")
+                if content and finish == "stop":
+                    return content
+        except Exception as e:
+            print(f"[LLM] API call failed: {e}", flush=True)
+        return ""
+
+    async def generate_legal_answer(self, query: str, context: str) -> dict:
         if not context.strip():
             return {
-                "verdict": "No relevant legal provisions found in the database for this query.",
-                "plain_language": "The legal database does not contain specific provisions matching your query. Please consult a qualified lawyer for advice on this matter.",
-                "plain_urdu": "Is sawal ka jawab hamari database mein dastaab nahi hai. Barah-e-karam kisi qualified wakeel se rabta karein.",
-                "steps": ["Consult a local lawyer", "Visit your nearest legal aid center"],
+                "verdict": "No relevant legal provisions found for this query.",
+                "plain_language": "The legal database does not contain specific provisions matching your query. Please consult a qualified lawyer.",
+                "plain_urdu": "Is sawal ka jawab hamari database mein nahi hai. Barah-e-karam kisi wakeel se rabta karein.",
+                "steps": ["Consult a local lawyer"],
                 "legal_references": [],
             }
 
-        prompt = f"""You are a Pakistani legal expert. Answer the user's question based ONLY on the legal context provided.
+        prompt = f"Answer briefly: {query}. Context: {context[:600]}. Reply with YES or NO then 2 sentences."
+        llm_result = await self._call_llm(prompt)
 
-LEGAL CONTEXT:
-{context}
+        if llm_result and len(llm_result) > 20:
+            return {
+                "verdict": llm_result[:300],
+                "plain_language": llm_result,
+                "plain_urdu": "",
+                "steps": ["Consult a local lawyer for specific advice"],
+                "legal_references": [],
+            }
 
-USER QUESTION:
-{query}
-
-Respond in this EXACT JSON format (no markdown, no code blocks):
-{{"verdict": "Clear YES or NO answer with one sentence explanation", "plain_language": "Detailed plain-English explanation of the legal position, 2-3 paragraphs", "plain_urdu": "Same explanation in Roman Urdu (Urdu in English script) for Pakistani citizens", "steps": ["Step 1: What to do first", "Step 2: What to do next", "Step 3: Additional step"], "legal_references": ["Reference 1", "Reference 2"]}}
-
-Rules:
-- verdict MUST start with YES or NO in capitals
-- Always cite specific articles/sections from the context
-- plain_urdu must be in Roman Urdu, not English
-- Keep plain_language under 300 words
-- Steps must be actionable and practical"""
-
-        async with httpx.AsyncClient() as client:
-            for attempt in range(3):
-                try:
-                    response = await client.post(
-                        f"{self.api_url}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": self.model,
-                            "messages": [
-                                {"role": "system", "content": "You are a Pakistani legal expert specializing in constitutional law, criminal law, and civil law. Always respond with valid JSON."},
-                                {"role": "user", "content": prompt},
-                            ],
-                            "temperature": 0.2,
-                            "max_tokens": 1500,
-                        },
-                        timeout=60.0,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    content = data["choices"][0]["message"]["content"]
-                    result = self._parse_llm_json(content)
-
-                    if isinstance(result.get("verdict"), str) and len(result["verdict"]) > 10:
-                        if "plain_language" not in result or not result["plain_language"]:
-                            result["plain_language"] = result["verdict"]
-                        if "plain_urdu" not in result:
-                            result["plain_urdu"] = ""
-                        if "steps" not in result or not isinstance(result["steps"], list):
-                            result["steps"] = ["Consult a local lawyer for specific advice"]
-                        if "legal_references" not in result:
-                            result["legal_references"] = []
-                        return result
-
-                except Exception as e:
-                    if attempt == 2:
-                        return {
-                            "verdict": "Unable to generate answer at this time.",
-                            "plain_language": f"An error occurred while processing your query. Please try again later or consult a local lawyer.",
-                            "plain_urdu": "Is waqt jawab dene mein masla aa raha hai. Barah-e-karam dubara koshish karein ya kisi local wakeel se rabta karein.",
-                            "steps": ["Try again later", "Consult a local lawyer"],
-                            "legal_references": [],
-                        }
-
-        return {
-            "verdict": "Unable to generate answer at this time.",
-            "plain_language": "Please try again.",
-            "plain_urdu": "Dubara koshish karein.",
-            "steps": [],
-            "legal_references": [],
-        }
+        return self._generate_from_context(query, context)

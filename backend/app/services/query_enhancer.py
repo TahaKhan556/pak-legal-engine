@@ -4,11 +4,11 @@ from app.config import settings
 
 
 LEGAL_KEYWORDS_MAP = {
-    "fir": "FIR first information report",
-    "giraftari": "arrest",
-    "arrest": "arrest detention",
-    "bail": "bail surety",
-    "zamanat": "bail surety",
+    "fir": "FIR first information report criminal complaint police",
+    "giraftari": "arrest detention criminal",
+    "arrest": "arrest detention criminal law police",
+    "bail": "bail criminal bail CrPC Section 497 498 release surety",
+    "zamanat": "bail criminal surety release",
     "chori": "theft theft robbery",
     "qatal": "murder homicide",
     "jahar": "poison",

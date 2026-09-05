@@ -131,7 +131,8 @@ export function Browse() {
             ) : documents.length === 0 ? (
               <div className="card text-center py-12">
                 <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No documents found matching your filters.</p>
+                <p className="text-gray-500 mb-1">No documents found matching your filters.</p>
+                <p className="text-sm text-gray-400">Try adjusting your search criteria or clearing filters.</p>
               </div>
             ) : (
               <div className="space-y-3">

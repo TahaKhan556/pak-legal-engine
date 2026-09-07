@@ -46,7 +46,7 @@ async def search_laws(request: SearchRequest, db: AsyncSession = Depends(get_db)
             doc_type=request.doc_type,
             year_from=request.year_from,
             year_to=request.year_to,
-            limit=5,
+            limit=7,
         )
         for r in results:
             if r["id"] not in seen_ids:
@@ -72,7 +72,7 @@ async def search_laws(request: SearchRequest, db: AsyncSession = Depends(get_db)
     ]
 
     context = "\n\n".join([
-        f"--- {r.title} ({r.section}) ---\n{r.content[:1500]}"
+        f"--- {r.title} ({r.section}) ---\n{r.content[:1200]}"
         for r in search_results
     ])
 

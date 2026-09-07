@@ -21,7 +21,7 @@ def _get_model() -> SentenceTransformer:
 
 
 class VectorSearchService:
-    MIN_SCORE = 0.68
+    MIN_SCORE = 0.65
 
     def __init__(self):
         self.client = QdrantClient(
@@ -78,7 +78,7 @@ class VectorSearchService:
             collection_name=self.collection,
             query=query_embedding,
             query_filter=query_filter,
-            limit=min(limit * 3, 30),
+            limit=min(limit * 4, 40),
             with_payload=True,
         )
 
